@@ -1,8 +1,4 @@
-<img src="https://www.modmium.dev/modmiumoutline.png" alt="Modmium" width="700">
-
-*Created by [CrOSmium](https://crosmium.dev) and [crosbreaker](https://crosbreaker.com)*
-
-Modmium is a chromeOS modification built to allow the freedom of an unrestricted device on a managed device.
+EZ-Modmium is a chromeOS modification forked from Modmium, built to have all the features of Modmium while being easier to use, with the addition of some quality-of-life improvements.
 
 ## Features
 * Reports as verified in the Google Admin Console (GAC)
@@ -22,8 +18,3 @@ Modmium is a chromeOS modification built to allow the freedom of an unrestricted
   * Feel free to submit a PR adding the dependency list for other distros!
 * To install modmium, see [docs/installation.md](docs/installation.md)
 * To learn other usage instructions (policy editors, MOSH, etc..), see [docs/usage.md](docs/usage.md)
-
-# Support
-If you need any kind of support, please join the [crosbreaker discord server](https://discord.crosbreaker.com) for help.
-
-------------
