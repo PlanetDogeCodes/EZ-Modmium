@@ -1,0 +1,5 @@
+# ShellCheck configuration for EZ-Modmium
+# https://github.com/koalaman/shellcheck/wiki/Directive
+
+external-sources=true
+disable=SC2086,SC2155,SC2034
