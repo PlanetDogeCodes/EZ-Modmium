@@ -1,0 +1,18 @@
+{
+  "_preset_name": "unlock-developer",
+  "_preset_description": "Enables Crostini, Borealis, Play Store, VPN, new users, and the gmail.com allowlist. The most common 'make my Chromebook free' preset.",
+  "DeviceAllowNewUsers": true,
+  "DeviceUserAllowlist": ["*@gmail.com"],
+  "DeviceUnaffiliatedCrostiniAllowed": true,
+  "DeviceBorealisAllowed": true,
+  "VirtualMachinesAllowed": true,
+  "UnaffiliatedArcAllowed": true,
+  "DeviceOpenNetworkConfiguration": "{\"DisableNetworkTypes\":[]}",
+  "DeviceGuestModeEnabled": true,
+  "DeviceShowUserNamesOnSignin": true,
+  "DeviceEphemeralUsersEnabled": false,
+  "DeviceBlockDevmode": false,
+  "DeviceRestrictedManagedGuestSessionEnabled": false,
+  "PluginVmAllowed": false,
+  "SupervisedUsersEnabled": false
+}

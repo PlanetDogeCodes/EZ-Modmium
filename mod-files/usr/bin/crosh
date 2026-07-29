@@ -1,0 +1,109 @@
+#!/bin/bash
+# written by DMD
+
+# -- CRITICAL UPDATE NOTICE THING --
+updch() {
+  hr=$(date +%H)
+  [[ -f /root/.iamsecure ]] && return
+  curnum=$(cat "/usr/share/.modfwver" 2>/dev/null || echo 0)
+  if [[ $curnum == 9999 ]]; then
+    CRITUPD=1
+    return
+  fi
+  [[ $hr -lt 13 || $hr -gt 17 || $((RANDOM % 8)) -ne 0 ]] && return # 1/4 chance to check the modfwver, and only from 1-6 PM local
+  remote=$(curl -sL "https://dmdtutorials.com/modfwver.txt" | tr -d '\r\n[:space:]')
+  
+  if [[ $remote -gt $curnum ]]; then 
+    CRITUPD=1
+    echo "9999" > /usr/share/.modfwver
+  fi
+}
+
+# -- LOGIN PROMPT --
+login() {
+  passwd="$(sudo cat /mnt/stateful_partition/etc/mosh.passwd 2>/dev/null)"
+  if [[ "$passwd" ]]; then
+    hash=$(echo "$passwd" | cut -d: -f2)
+    trap "" SIGINT
+    while true; do
+      stty -echo
+      echo -e "MOSH has been locked with a password, please log in below."
+      echo -ne "Enter MOSH password: "
+      read -r auth
+      stty echo
+      echo ""
+      salt=$(echo "$hash" | cut -d'$' -f3)
+      hashin=$(openssl passwd -1 -salt "$salt" "$auth")
+      if [[ "$hashin" != "$hash" ]]; then
+        echo -e "Incorrect password, please try again."
+        sleep "$(awk 'BEGIN {srand(); printf "%.2f", 0.6 + (rand() * 0.4)}')" # tuff random sleep to make brute forcing harder
+        clear
+        continue
+      else
+        echo -e "Login successful!"
+        trap - SIGINT
+        sleep 0.4
+        break
+      fi
+    done
+  fi
+}
+
+# -- Pre TUI init --
+stty -echo
+[[ -f /root/.givemecrosh ]] && exec /usr/bin/crosh.old # flag to just use crosh instead of MOSH
+echo -ne "\033]0;MOSH\007"
+source /usr/lib/libmosh.sh
+login
+updch
+if [[ -d /usr/local/nix/store ]]; then
+  # issues can get caused if a user has a custom shell.
+  # before, this code only ran if .bashrc was sourced,
+  # but the shell wouldn't open if .bashrc wasn't sourced
+  # chicken and egg. we fix it here.
+  if ! mountpoint -q /nix; then
+    sudo mkdir -p /nix
+    sudo mount --bind /usr/local/nix /nix
+  fi
+  source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+  unset LD_LIBRARY_PATH
+fi
+
+# -- FUNCTIONS --
+
+rootsh(){
+  runscript "sudo -i -u root"
+}
+chronosh(){
+  runscript "sudo -i -u chronos"
+}
+crosh(){
+  runscriptnoroot "exec /usr/bin/crosh.old"
+}
+update(){
+  runscript /usr/bin/update-modmium.sh
+}
+devpol(){
+  runscript /usr/bin/devpolicy-editor.sh
+}
+apps(){
+  runscript /usr/bin/mosh-apps.sh
+}
+misc(){
+  runscript /usr/bin/mosh-misc.sh
+}
+
+# -- MAIN SCRIPT --
+tput civis # :whale:
+[[ $CRITUPD == 1 ]] && menuText="\n${R}Warning: There is a critical Modmium update available, please update Modmium whenever possible.${N}\n"
+menu_reset() {
+  options=("Root Shell" "Chronos Shell" "Crosh" "Manage Modmium" "Edit Device Policies" "Apps" "Misc" "Exit")
+  functions=("rootsh" "chronosh" "crosh" "update" "devpol" "apps" "misc" "quit")
+  num_options=${#options[@]}
+}
+
+menu_reset
+clear
+full_menu
+tput cnorm
+selector

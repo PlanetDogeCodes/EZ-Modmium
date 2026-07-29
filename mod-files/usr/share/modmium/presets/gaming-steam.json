@@ -1,0 +1,8 @@
+{
+  "_preset_name": "gaming-steam",
+  "_preset_description": "Enables Steam (Borealis) + the virtual machines required for it + Crostini. You still need to toggle the Borealis flag in chrome://flags after applying.",
+  "DeviceBorealisAllowed": true,
+  "VirtualMachinesAllowed": true,
+  "DeviceUnaffiliatedCrostiniAllowed": true,
+  "DeviceAllowNewUsers": true
+}

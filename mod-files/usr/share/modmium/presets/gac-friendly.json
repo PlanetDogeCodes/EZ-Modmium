@@ -1,0 +1,9 @@
+{
+  "_preset_name": "gac-friendly",
+  "_preset_description": "Minimal changes that keep the device reporting to the Google Admin Console normally. Only enables the most commonly-desired features (new users + Crostini) without touching reporting policies. The device will still appear online and healthy.",
+  "DeviceAllowNewUsers": true,
+  "DeviceUnaffiliatedCrostiniAllowed": true,
+  "DeviceShowUserNamesOnSignin": true,
+  "DeviceGuestModeEnabled": false,
+  "DeviceEphemeralUsersEnabled": false
+}
