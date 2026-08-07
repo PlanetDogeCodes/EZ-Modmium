@@ -18,6 +18,15 @@ stty -echo
 tput civis
 clear
 
+# SIGINT/SIGTERM trap — restore terminal on interrupt
+_ez_sigint() {
+  stty echo 2>/dev/null || true
+  tput cnorm 2>/dev/null || true
+  rm -f /tmp/mosh_tmp.json 2>/dev/null || true
+  exit 1
+}
+trap _ez_sigint INT TERM
+
 source /usr/lib/libmosh.sh
 
 if [[ ! -f $DEVPOL_FILE ]] || [[ ! -d /usr/local/share/policy-test-tool ]]; then
@@ -238,6 +247,7 @@ editJsonValue(){
     allowInput
     echo -e "${B}Editing ${N}$key"
     confirmOrCancel || { disallowInput; return; }
+    local newval
     read -p "Enter new value: " newval
     jq --arg k "$key" --argjson v "$newval" '.device[$k] = $v' "$jsonFile" > "${jsonFile}.tmp" 2>/dev/null
     if [ $? -eq 0 ]; then mv "${jsonFile}.tmp" "$jsonFile"; fi
@@ -572,7 +582,7 @@ full_menu(){
           local policyBackup=$(ls policy.*.bak.enterprise 2>/dev/null)
           [[ -n "$policyBackup" ]] && mv "$policyBackup" "${policyBackup%.bak.enterprise}" &> /dev/null
           popd &> /dev/null
-          rm -rf $jsonFile
+          rm -rf "$jsonFile"
           echo -e "${G}Done!${N}"; sleep 2; restart ui; exit 0 ;;
         6) searchPolicies ;;
         7) loadPreset ;;

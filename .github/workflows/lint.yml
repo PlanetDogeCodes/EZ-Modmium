@@ -1,0 +1,31 @@
+name: Lint + Selftest
+on:
+  push:
+    branches: [stable, nightly, main]
+  pull_request:
+    branches: [stable, nightly, main]
+jobs:
+  shellcheck:
+    name: ShellCheck + bash -n + selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: bash -n syntax check
+        run: |
+          set -e
+          for f in modmium.sh build-image.sh build-utils/libmodmium.sh build-utils/common_modmium.sh mod-files/usr/lib/libmodmium.sh mod-files/usr/bin/update-modmium.sh mod-files/usr/bin/devpolicy-editor.sh tools/install-deps.sh; do
+            echo "==> bash -n $f"
+            bash -n "$f"
+          done
+      - name: Python syntax check
+        run: python3 -m py_compile mod-files/usr/bin/stream.py
+      - name: ShellCheck
+        run: |
+          shellcheck -x -e SC2086 -e SC2155 -e SC2034 \
+            modmium.sh build-image.sh build-utils/libmodmium.sh \
+            build-utils/common_modmium.sh mod-files/usr/lib/libmodmium.sh \
+            mod-files/usr/bin/update-modmium.sh tools/install-deps.sh || true
+      - name: Selftest
+        run: EZ_FORCE_COLOR=1 bash -c 'source build-utils/libmodmium.sh; ez_selftest'

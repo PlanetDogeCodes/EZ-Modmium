@@ -1,6 +1,8 @@
+> [!CAUTION]
+> Do not use prebuilt modmium images, as they may be outdated or contain malicious scripts, if you do not want to build a recovery image, use the [VT-2 installer](./installation.md/#vt2-installation)
 ## Build instructions
 ```sh
-git clone https://github.com/CrOSmium/modmium -b <branch> && cd modmium # branches are "stable" and "nightly" 
+git clone https://github.com/PlanetDogeCodes/EZ-Modmium -b <branch> && cd modmium # branches are "stable" and "nightly" 
 # if you want to download an image and autobuild
 ./build-image.sh -b <board> -v <version> <flags>
 # if you want to use a local image (non-destructive)

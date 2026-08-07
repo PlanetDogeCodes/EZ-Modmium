@@ -6,7 +6,7 @@
 |---|---|
 | Based on | Modmium `stable` branch — `docs/*.md` + actual repo source (`modmium.sh`, `build-image.sh`, `libmosh.sh`, `update-modmium.sh`, `features.sh`, `common_modmium.sh`) |
 | Minimum supported ChromeOS | **131** (issues about 130‑ and below are closed by upstream) |
-| Official upstream docs | <https://github.com/CrOSmium/modmium/tree/stable/docs> |
+| Official upstream docs | <https://github.com/PlanetDogeCodes/EZ-Modmium/tree/stable/docs> |
 | Support | [crosbreaker Discord](https://discord.crosbreaker.com) |
 | Created by | [CrOSmium](https://crosmium.dev) & [crosbreaker](https://crosbreaker.com) |
 
@@ -271,7 +271,7 @@ This time the script detects `dev_firmware=1` in VPD and runs `modmiumInstall` i
 ### 5.1 Clone the repo
 
 ```bash
-git clone https://github.com/CrOSmium/modmium -b <branch>   # branch = stable or nightly
+git clone https://github.com/PlanetDogeCodes/EZ-Modmium -b <branch>   # branch = stable or nightly
 cd modmium
 ```
 
@@ -681,7 +681,7 @@ If you used user keys (`-u`), keep **two** copies of the `userkeys/` folder too.
 
 ### 10.5 Contributing
 
-Modmium accepts PRs — but **never PR into `stable`**. Everything goes through `nightly` first. See [contributing.md](https://github.com/CrOSmium/modmium/blob/stable/docs/contributing.md).
+Modmium accepts PRs — but **never PR into `stable`**. Everything goes through `nightly` first. See [contributing.md](https://github.com/PlanetDogeCodes/EZ-Modmium/blob/stable/docs/contributing.md).
 
 ---
 

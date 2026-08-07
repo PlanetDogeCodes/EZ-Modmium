@@ -29,9 +29,9 @@ EZ_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 : "${EZ_GBB_FLAGS:=0xa0b1}"
 : "${EZ_TPM_KERNVER_INDEX:=0x1008}"
 : "${EZ_RELEASES_JSON_URL:=https://cdn.jsdelivr.net/gh/crosbreaker/chromeos-releases-data/data.json}"
-: "${EZ_MODMIUM_SH_URL:=https://modmium.dev/modmium.sh}"
+: "${EZ_MODMIUM_SH_URL:=https://raw.githubusercontent.com/PlanetDogeCodes/EZ-Modmium/stable/modmium.sh}"
 : "${EZ_FWMP_SH_URL:=https://modmium.dev/fwmp.sh}"
-: "${EZ_STREAM_PY_URL:=https://modmium.dev/tools/stream.py}"
+: "${EZ_STREAM_PY_URL:=https://raw.githubusercontent.com/PlanetDogeCodes/EZ-Modmium/stable/mod-files/usr/bin/stream.py}"
 : "${EZ_HWWP_GUIDE_URL:=https://crosmium.dev/HWWP}"
 : "${EZ_LOG_ENABLED:=1}"
 : "${EZ_LOG_QUIET:=0}"
@@ -273,6 +273,15 @@ format_part_number() {
   echo -n "$1"
   echo "$1" | grep -q '[0-9]$' && echo -n p
   echo -n "$2"
+}
+
+# mount_mkdir — wrapper that handles older util-linux without --mkdir support
+# Usage: mount_mkdir <source> <mountpoint> [extra mount options]
+mount_mkdir() {
+  local src="$1" mnt="$2"; shift 2
+  mkdir -p "$mnt" 2>/dev/null || true
+  # Try with --mkdir first (util-linux 2.38+), fall back to plain mount
+  mount --mkdir "$@" "$src" "$mnt" 2>/dev/null || mount "$@" "$src" "$mnt"
 }
 
 # get_largest_cros_blockdev — find the internal ChromeOS disk
@@ -618,7 +627,7 @@ state_show() {
 # If EZ_VERIFY_DOWNLOADS=1 and a .sig is present, gpg is used to verify it.
 
 EZ_VERIFY_DOWNLOADS="${EZ_VERIFY_DOWNLOADS:-1}"
-EZ_MANIFEST_BASE_URL="${EZ_MANIFEST_BASE_URL:-https://raw.githubusercontent.com/crosmium/modmium/stable/build-utils/manifests}"
+EZ_MANIFEST_BASE_URL="${EZ_MANIFEST_BASE_URL:-https://raw.githubusercontent.com/PlanetDogeCodes/EZ-Modmium/stable/build-utils/manifests}"
 
 # fetch_and_verify <url> <output_path> [expected_sha256]
 # Downloads <url> to <output_path>. If [expected_sha256] is given, verifies it.

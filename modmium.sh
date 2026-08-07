@@ -24,6 +24,19 @@
 
 set -uo pipefail
 
+# SIGINT/SIGTERM trap — clean up on Ctrl+C to prevent bricked devices
+ez_sigint_cleanup() {
+  log_warn "Interrupted by user — cleaning up..."
+  stty echo 2>/dev/null || true
+  tput cnorm 2>/dev/null || true
+  command -v umount >/dev/null 2>&1 && umount mnt 2>/dev/null || true
+  command -v umount >/dev/null 2>&1 && umount "${BACKUP:-/tmp/backupdir}" 2>/dev/null || true
+  rm -f config.txt /tmp/devfw.bin 2>/dev/null || true
+  log_warn "Cleanup done. If you interrupted during flashing, DO NOT REBOOT — re-run with a valid backup."
+  exit 1
+}
+trap ez_sigint_cleanup INT TERM
+
 # ---------------------------------------------------------------------------
 # Locate and source the shared library + config
 # ---------------------------------------------------------------------------
@@ -133,7 +146,7 @@ CONFIGURATION:
 
 HELP:
   Discord: https://discord.crosbreaker.com
-  Docs:    https://github.com/CrOSmium/modmium/tree/stable/docs
+  Docs:    https://github.com/PlanetDogeCodes/EZ-Modmium
 EOF
 }
 
@@ -247,6 +260,11 @@ selectBackup() {
       driveloc="${driveloc%/}"
       local fulldev="$driveloc"
       [[ "$driveloc" != *"/dev/"* ]] && fulldev="/dev/$driveloc"
+      # Validate: must be a block device, must NOT be the internal disk
+      [[ -b "$fulldev" ]] || fail "${R}$fulldev is not a block device.${N}"
+      local _intdisk
+      _intdisk=$(get_largest_cros_blockdev 2>/dev/null || echo "")
+      [[ -n "$_intdisk" && "$fulldev" == "$_intdisk" ]] && fail "${R}REFUSING TO WIPE THE INTERNAL DISK ($fulldev).${N}"
 
       if [[ "$FLAGS_dryrun" == "$FLAGS_TRUE" ]]; then
         log_info "[dry-run] Would mkfs.vfat + mount $fulldev"
@@ -320,17 +338,21 @@ flashDevFW() {
 
   # Clear FWMP (best-effort, with TPM fallback)
   log_step "Clearing FWMP..."
-  (
-    device_management_client --action=remove_firmware_management_parameters >/dev/null 2>&1 || \
-    cryptohome --action=remove_firmware_management_parameters >/dev/null 2>&1
-    device_management_client --action=set_firmware_management_parameters --flags=0x0 >/dev/null 2>&1 || \
-    cryptohome --action=set_firmware_management_parameters --flags=0x0 >/dev/null 2>&1
-  ) || (
+  local _fwmp_removed=0 _fwmp_set=0
+  if device_management_client --action=remove_firmware_management_parameters >/dev/null 2>&1 || \
+     cryptohome --action=remove_firmware_management_parameters >/dev/null 2>&1; then
+    _fwmp_removed=1
+  fi
+  if device_management_client --action=set_firmware_management_parameters --flags=0x0 >/dev/null 2>&1 || \
+     cryptohome --action=set_firmware_management_parameters --flags=0x0 >/dev/null 2>&1; then
+    _fwmp_set=1
+  fi
+  if [[ $_fwmp_removed -eq 0 || $_fwmp_set -eq 0 ]]; then
     initctl stop tcsd >/dev/null 2>&1 || true
     initctl stop trunksd >/dev/null 2>&1 || true
     tpmc clear; tpmc def 0x100a 0x28 0x12000
     tpmc write 0x100a 76 28 10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-  )
+  fi
 
   if [[ "$DEVFW" != 1 ]]; then
     log_step "Making firmware backup..."
@@ -541,10 +563,10 @@ installCros() {
     cd /mnt/stateful_partition/git || fail "cd failed"
     if [[ -d /root/.ssh ]]; then
       [[ ! -d /home/chronos/user/.ssh ]] && mkdir -p /home/chronos/user/.ssh
-      git clone --depth 1 -b "$branch" --single-branch git@github.com:crosmium/modmium.git \
+      git clone --depth 1 -b "$branch" --single-branch git@github.com:PlanetDogeCodes/EZ-Modmium.git \
         || fail "${R}Failed to clone repository, exiting...${N}" keepflag
     else
-      git clone --depth 1 -b "$branch" --single-branch https://github.com/crosmium/modmium.git \
+      git clone --depth 1 -b "$branch" --single-branch https://github.com/PlanetDogeCodes/EZ-Modmium.git \
         || fail "${R}Failed to clone repository, exiting...${N}" keepflag
     fi
     log_info "Successfully cloned repository! Dropping new files..."
@@ -591,10 +613,12 @@ installCros() {
   local activekern inactivekern
   activekern=$(get_booted_kernnum "$intdis")
   inactivekern=$(opposite_num "$activekern")
-  cgpt add -P 1 -T 0 -S 1 -i "$activekern" "$intdis" \
-    || fail "${R}cgpt: failed to demote active kernel $activekern — DO NOT REBOOT.${N}" keepflag
+  # Promote NEW kernel BEFORE demoting old (prevents "both demoted" brick if cgpt fails)
   cgpt add -P 15 -T 6 -S 0 -i "$inactivekern" "$intdis" \
     || fail "${R}cgpt: failed to promote inactive kernel $inactivekern — DO NOT REBOOT.${N}" keepflag
+  sync
+  cgpt add -P 1 -T 0 -S 1 -i "$activekern" "$intdis" \
+    || fail "${R}cgpt: failed to demote active kernel $activekern — NEW KERNEL WILL BOOT ON REBOOT.${N}" keepflag
   sync
   save_state "boot_switched"
   state_clear  # Success — clear the state file
@@ -670,9 +694,27 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Preflight: verify critical tools exist before doing anything
+# ---------------------------------------------------------------------------
+ez_preflight() {
+  local missing=0
+  for tool in vpd flashrom cgpt rootdev; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      log_error "Required tool not found: $tool"
+      missing=1
+    fi
+  done
+  if [[ $missing -eq 1 ]]; then
+    log_error "This script must be run on a ChromeOS device in developer mode."
+    exit 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Entry point — mirrors upstream's stage detection
 # ---------------------------------------------------------------------------
 BOARD="$(grep '^CHROMEOS_RELEASE_DESCRIPTION=' /etc/lsb-release 2>/dev/null | awk '{print $NF}')"
+ez_preflight
 
 clear
 DEVFW=$(vpd -i RO_VPD -g "dev_firmware" 2>&1 || echo "")

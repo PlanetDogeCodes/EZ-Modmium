@@ -228,6 +228,7 @@ if [[ "$SKIP_OOBE" -eq 1 ]]; then
     sleep 0.25
   done
 else
-  sleep 3
+      echo -e "If you are still in the oobe once this menu closes, open a root shell and type 'initctl restart ui'"
+      sleep 4
   exit 0
 fi

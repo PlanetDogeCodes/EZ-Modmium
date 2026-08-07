@@ -378,4 +378,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user — exiting. Partial writes may have occurred.", file=sys.stderr)
+        sys.exit(130)
+    except IOError as e:
+        print("error: {}".format(e), file=sys.stderr)
+        sys.exit(1)

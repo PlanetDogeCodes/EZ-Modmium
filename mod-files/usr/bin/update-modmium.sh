@@ -6,6 +6,17 @@
 
 set -uo pipefail
 
+# SIGINT/SIGTERM trap — clean up on Ctrl+C to prevent bricked devices
+_ez_sigint_cleanup() {
+  stty echo 2>/dev/null || true
+  tput cnorm 2>/dev/null || true
+  umount mnt 2>/dev/null || true
+  rm -f config.txt 2>/dev/null || true
+  echo -e "\n${R}Interrupted — cleanup done. DO NOT REBOOT if you interrupted during flashing.${N}"
+  exit 1
+}
+trap _ez_sigint_cleanup INT TERM
+
 # Source the shared EZ-Modmium library (colors, helpers, config, logging)
 if [[ -f /usr/lib/libmodmium.sh ]]; then
   # shellcheck disable=SC1091
@@ -212,12 +223,12 @@ updateModmium() {
   [[ -d modmium ]] && rm -rf modmium
   if [[ -d /root/.ssh ]]; then
     [[ ! -d /home/chronos/user/.ssh ]] && mkdir /home/chronos/user/.ssh
-    git clone --depth 1 -b $branch --single-branch git@github.com:crosmium/modmium.git || fail "${R}Failed to clone repository, exiting...${N}"
+    local _ct=0; while [[ $_ct -lt 3 ]]; do git clone --depth 1 -b "$branch" --single-branch git@github.com:PlanetDogeCodes/EZ-Modmium.git && break; _ct=$((_ct+1)); [[ $_ct -lt 3 ]] && { log_warn "clone failed ($_ct/3), retry..."; sleep 5; }; done; [[ $_ct -lt 3 ]] || fail "${R}Failed to clone repository after 3 attempts${N}"
   else
-    git clone --depth 1 -b $branch --single-branch https://github.com/crosmium/modmium.git || fail "${R}Failed to clone repository, exiting...${N}"
+    local _ct=0; while [[ $_ct -lt 3 ]]; do git clone --depth 1 -b "$branch" --single-branch https://github.com/PlanetDogeCodes/EZ-Modmium.git && break; _ct=$((_ct+1)); [[ $_ct -lt 3 ]] && { log_warn "clone failed ($_ct/3), retry..."; sleep 5; }; done; [[ $_ct -lt 3 ]] || fail "${R}Failed to clone repository after 3 attempts${N}"
   fi
   echo -e "${G}Successfully cloned repository!${N} Dropping new files..."
-  dropModFiles || fail "${R}Failed to drop updated files, please make an issue report on https://github.com/crosmium/modmium with details of changes you made, if any...${N}"
+  dropModFiles || fail "${R}Failed to drop updated files, please make an issue report on https://github.com/PlanetDogeCodes/EZ-Modmium with details of changes you made, if any...${N}"
   echo -e "${G}Done! Cleaning up...${N}"
   rm -rf /mnt/stateful_partition/git/modmium
   echo "$branch" > /.branch # actually update branch
@@ -323,9 +334,9 @@ installCros() {
   [[ -d modmium ]] && rm -rf modmium
   if [[ -d /root/.ssh ]]; then
     [[ ! -d /home/chronos/user/.ssh ]] && mkdir /home/chronos/user/.ssh
-    git clone --depth 1 -b "$branch" --single-branch git@github.com:crosmium/modmium.git || fail "${R}Failed to clone repository, exiting...${N}"
+    local _ct=0; while [[ $_ct -lt 3 ]]; do git clone --depth 1 -b "$branch" --single-branch git@github.com:PlanetDogeCodes/EZ-Modmium.git && break; _ct=$((_ct+1)); [[ $_ct -lt 3 ]] && { log_warn "clone failed ($_ct/3), retry..."; sleep 5; }; done; [[ $_ct -lt 3 ]] || fail "${R}Failed to clone repository after 3 attempts${N}"
   else
-    git clone --depth 1 -b "$branch" --single-branch https://github.com/crosmium/modmium.git || fail "${R}Failed to clone repository, exiting...${N}"
+    local _ct=0; while [[ $_ct -lt 3 ]]; do git clone --depth 1 -b "$branch" --single-branch https://github.com/PlanetDogeCodes/EZ-Modmium.git && break; _ct=$((_ct+1)); [[ $_ct -lt 3 ]] && { log_warn "clone failed ($_ct/3), retry..."; sleep 5; }; done; [[ $_ct -lt 3 ]] || fail "${R}Failed to clone repository after 3 attempts${N}"
   fi
   log_info "Successfully cloned repository! Dropping new files..."
 
@@ -397,8 +408,12 @@ fi
   echo -e "Switching active kernel..."
   activekern=$(get_booted_kernnum)
   inactivekern=$(opposite_num "${activekern}")
-  cgpt add -P 1 -T 0 -S 1 -i ${activekern} ${intdis}
-  cgpt add -P 15 -T 6 -S 0 -i ${inactivekern} ${intdis}
+  # Promote NEW kernel BEFORE demoting old (prevents "both demoted" brick)
+  cgpt add -P 15 -T 6 -S 0 -i "${inactivekern}" "${intdis}" \
+    || fail "${R}cgpt: failed to promote inactive kernel ${inactivekern} — DO NOT REBOOT.${N}"
+  sync
+  cgpt add -P 1 -T 0 -S 1 -i "${activekern}" "${intdis}" \
+    || fail "${R}cgpt: failed to demote active kernel ${activekern} — NEW KERNEL WILL BOOT ON REBOOT.${N}"
   sync
   echo -e "${G}Done! Would you like to reboot now? [Y/n]${N}"
   read -n1 -r
@@ -438,7 +453,8 @@ if [[ -f /etc/chrome_dev.conf ]]; then
   mkdir -p /tmp/opposite
 
   newRoot=$((newKern + 1))
-  mount ${intdis_prefix}${newRoot} /tmp/opposite 2>/dev/null
+  mount "${intdis_prefix}${newRoot}" /tmp/opposite \
+    || fail "${R}Failed to mount ${intdis_prefix}${newRoot} on /tmp/opposite${N}"
 
   mkdir -p /tmp/opposite/etc
   cp -a /etc/chrome_dev.conf /tmp/opposite/etc/chrome_dev.conf
@@ -470,10 +486,12 @@ else
   echo -e "${B}Keeping packages installed.${N}"
 fi
   echo -e "Switching active kernel..."
-  cgpt add "$intdis" -i "$currentKern" -P 1 -S 1 -T 0 \
-    || fail "${R}cgpt: failed to demote kernel ${currentKern}${N}"
+  # Promote NEW kernel BEFORE demoting old (prevents "both demoted" brick)
   cgpt add "$intdis" -i "$newKern" -P 15 -S 0 -T 15 \
     || fail "${R}cgpt: failed to promote kernel ${newKern}${N}"
+  sync
+  cgpt add "$intdis" -i "$currentKern" -P 1 -S 1 -T 0 \
+    || fail "${R}cgpt: failed to demote kernel ${currentKern}${N}"
   echo -e "${G}Done! Switched to kernel on ${intdis_prefix}${newKern}${N}"
   sync
   sleep 3

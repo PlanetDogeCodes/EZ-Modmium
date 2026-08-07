@@ -31,7 +31,7 @@ MILESTONE=$(grep MILESTONE /etc/lsb-release | cut -d= -f2 | tr -d '\r')
 get_largest_cros_blockdev() {
   local largest size dev_name tmp_size remo
   size=0
-  command -v sfdisk >/dev/null 2>&1 || command return 0
+  command -v sfdisk >/dev/null 2>&1 || return 0
   for blockdev in /sys/block/*; do
     dev_name="${blockdev##*/}"
     echo "$dev_name" | grep -q '^\(loop\|ram\)' && continue
@@ -56,7 +56,7 @@ format_part_number() {
 }
 get_fixed_dst_drive() {
   local dev
-  if [ -z "${DEFAULT_ROOTDEV}" ]; then
+  if [ -z "${DEFAULT_ROOTDEV:-}" ]; then
     for dev in /sys/block/sd* /sys/block/mmcblk*; do
       if [ ! -d "${dev}" ] || [ "$(cat "${dev}/removable")" = 1 ] || [ "$(cat "${dev}/size")" -lt 2097152 ]; then
         continue
@@ -68,10 +68,10 @@ get_fixed_dst_drive() {
             ;;
         esac
       fi
-      DEFAULT_ROOTDEV="{$dev}"
+      DEFAULT_ROOTDEV="$dev"
     done
   fi
-  if [ -z "${DEFAULT_ROOTDEV}" ]; then
+  if [ -z "${DEFAULT_ROOTDEV:-}" ]; then
     dev=""
   else
     dev="/dev/$(basename ${DEFAULT_ROOTDEV})"
@@ -101,7 +101,11 @@ selector() {
 
 menu_logo() {
   echo -ne "\033]0;MOSH\007"
-  echo -e "Welcome to MOSH, the Modmium developer shell\n\nIf you got here by mistake, don't panic! Just close this tab and carry on.\n\nThis shell contains a list of utilities for performing various actions on a chromebook running Modmium.\n"
+  if [[ "$TERM" != "xterm" && "$TERM" != "xterm-256color" ]]; then
+    echo -e "Welcome to VT-MOSH, the Modmium developer console.\n\nIf you got here by mistake, don't panic! Just press exit, then Ctrl+Alt+F1 [usually the back arrow] and carry on.\n\nThis console contains a list of utilities for performing various actions on a chromebook running Modmium.\n"
+  else 
+    echo -e "Welcome to MOSH, the Modmium developer shell\n\nIf you got here by mistake, don't panic! Just close this tab and carry on.\n\nThis shell contains a list of utilities for performing various actions on a chromebook running Modmium.\n"
+  fi
 }
 
 employ() { # this named employ to scare fanxql away

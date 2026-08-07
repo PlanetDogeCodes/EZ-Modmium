@@ -76,7 +76,7 @@ EOF
 
 cat <<EOF >/usr/share/chromeos-assets/text/boot_messages/en/update_firmware.txt
 your firmware is updating!! (if you see this message, report an issue ASAP)
-https://github.com/crosmium/modmium
+https://github.com/PlanetDogeCodes/EZ-Modmium
 EOF
 
 # single-liners

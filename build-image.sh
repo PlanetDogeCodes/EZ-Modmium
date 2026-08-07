@@ -18,6 +18,15 @@
 
 set -uo pipefail
 
+# SIGINT/SIGTERM trap
+_ez_sigint() {
+  log_warn "Interrupted by user — cleaning up..."
+  [[ -n "${loopDev:-}" ]] && losetup -d "$loopDev" 2>/dev/null || true
+  umount mnt 2>/dev/null || true
+  exit 1
+}
+trap _ez_sigint INT TERM
+
 # ---------------------------------------------------------------------------
 # Early --help/-h catch (before any sudo/dir checks)
 # ---------------------------------------------------------------------------
@@ -500,6 +509,11 @@ backupUserKeys() {
   fi
   local fulldev="$driveloc"
   [[ "$driveloc" != *"/dev/"* ]] && fulldev="/dev/$driveloc"
+  # Validate: must be a block device, must NOT be the internal disk
+  [[ -b "$fulldev" ]] || fail "${R}$fulldev is not a block device.${N}"
+  local _intdisk
+  _intdisk=$(get_largest_cros_blockdev 2>/dev/null || echo "")
+  [[ -n "$_intdisk" && "$fulldev" == "$_intdisk" ]] && fail "${R}REFUSING TO WIPE THE INTERNAL DISK ($fulldev).${N}"
   if ! mkfs.vfat -I -F 32 "$fulldev"; then fail "${R}Unable to wipe device...${N}"; fi
   mkdir -p "$BACKUPDIR"
   if ! mount "$fulldev" "$BACKUPDIR"; then fail "${R}Unable to mount device...${N}"; fi
